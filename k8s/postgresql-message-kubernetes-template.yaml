@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres-message-namespace
+  labels:
+    environment: production
+    app: postgres
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-secret
+  namespace: postgres-message-namespace
+  labels:
+    app: postgres
+data:
+  POSTGRES_USER: ${MESSAGE_POSTGRES_USER}
+  POSTGRES_PASSWORD: ${MESSAGE_POSTGRES_PASSWORD}
+  POSTGRES_DB: ${MESSAGE_POSTGRES_DB}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+  namespace: postgres-message-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: role
+                    operator: In
+                    values:
+                      - database-message  # Nome do label do node
+      containers:
+        - name: postgres
+          image: 'postgres:16'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-secret
+          volumeMounts:
+            - name: sql-files
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: sql-files
+          configMap:
+            name: database-sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: postgres-message-namespace
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-sql
+  namespace: postgres-message-namespace
+data:
+  init-db1.sql: |
+    create type public.message_type_enum as enum (
+      'SMS',
+      'EMAIL',
+    );
+
+    create type public.message_status_enum as enum (
+      'SUCCESS',
+      'FAIL',
+    );
+
+    create table if not exists public.message(
+      id uuid,
+      type public.message_type_enum not null,
+      status public.message_status_enum not null,
+      content varchar(255) not null,
+      subject varchar(255),
+      email varchar(255),
+      phone varchar(11),
+      created_at timestamp default current_timestamp,
+      updated_at timestamp default current_timestamp,
+      constraint pk_message primary key (id)
+    );
