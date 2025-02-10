@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres-user-namespace
+  labels:
+    environment: production
+    app: postgres
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-secret
+  namespace: postgres-user-namespace
+  labels:
+    app: postgres
+data:
+  POSTGRES_USER: ${USER_POSTGRES_USER}
+  POSTGRES_PASSWORD: ${USER_POSTGRES_PASSWORD}
+  POSTGRES_DB: ${USER_POSTGRES_DB}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+  namespace: postgres-user-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: role
+                    operator: In
+                    values:
+                      - database-user  # Nome do label do node
+      containers:
+        - name: postgres
+          image: 'postgres:16'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-secret
+          volumeMounts:
+            - name: sql-files
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: sql-files
+          configMap:
+            name: database-sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: postgres-user-namespace
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-sql
+  namespace: postgres-user-namespace
+data:
+  init-db1.sql: |
+    create table if not exists public.user(
+      id uuid,
+      birthdate date not null,
+      name varchar(100) not null,
+      email varchar(255) not null unique,
+      password varchar(255) not null,
+      created_at timestamp default current_timestamp,
+      updated_at timestamp default current_timestamp,
+      constraint pk_customer primary key (id)
+    );

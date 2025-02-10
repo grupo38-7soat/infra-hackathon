@@ -42,6 +42,30 @@ jobs:
             --nodes 1 \
             --nodes-min 1 \
             --nodes-max 2
+        
+      # Criar o grupo de nós para o PostgreSQL
+      - name: Create Node Group for PostgreSQL
+        run: |
+          eksctl create nodegroup \
+            --cluster $REPO_NAME \
+            --name db-user-nodes \
+            --node-labels "role=database-user" \
+            --node-type t2.medium \
+            --nodes 1 \
+            --nodes-min 1 \
+            --nodes-max 2
+
+      # Criar o grupo de nós para o PostgreSQL
+      - name: Create Node Group for PostgreSQL
+        run: |
+          eksctl create nodegroup \
+            --cluster $REPO_NAME \
+            --name db-message-nodes \
+            --node-labels "role=database-message" \
+            --node-type t2.medium \
+            --nodes 1 \
+            --nodes-min 1 \
+            --nodes-max 2
 
       # Verificar o status do cluster
       - name: Verify Cluster Status
