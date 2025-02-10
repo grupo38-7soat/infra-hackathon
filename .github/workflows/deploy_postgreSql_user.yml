@@ -1,0 +1,70 @@
+name: User PostgreSQL Deployment
+
+on:
+  workflow_dispatch: # Permite executar manualmente o workflow
+
+env:
+  CLUSTER_NAME: "infra-hackathon"  # Nome do cluster EKS
+
+jobs:
+  ci:
+    name: Validate EKS
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout do código
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Configurar AWS CLI
+      - name: Configure AWS CLI
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Verificar se o EKS já foi criado
+      - name: Check if EKS cluster exists
+        run: |
+          aws eks describe-cluster --name $CLUSTER_NAME --region ${{ secrets.AWS_REGION }} || exit 1
+        continue-on-error: false  # Caso o cluster não exista, o workflow falha aqui
+
+  cd:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: ci
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Configurar AWS CLI
+      - name: Configure AWS CLI
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Configurar kubectl para interagir com o EKS
+      - name: Configure kubectl
+        run: |
+          aws eks --region ${{ secrets.AWS_REGION }} update-kubeconfig --name $CLUSTER_NAME
+
+      # Definir as variáveis de ambiente
+      - name: Set environment variables
+        run: |
+          echo "USER_POSTGRES_USER=${{ secrets.USER_POSTGRES_USER }}" >> $GITHUB_ENV
+          echo "USER_POSTGRES_PASSWORD=${{ secrets.USER_POSTGRES_PASSWORD }}" >> $GITHUB_ENV
+          echo "USER_POSTGRES_DB=${{ secrets.USER_POSTGRES_DB }}" >> $GITHUB_ENV
+
+      # Substituir variáveis nos arquivos Kubernetes
+      - name: Substitute variables in deployment.yaml
+        run: |
+          envsubst < k8s/postgresql-user-kubernetes-template.yaml > k8s/deployment-final.yaml
+
+      # Aplicar Kubernetes manifests
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/deployment-final.yaml
