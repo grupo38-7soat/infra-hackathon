@@ -27,7 +27,7 @@ jobs:
       # Extrair o nome do repositório
       - name: Extract repository name
         id: repo-name
-        run: echo "REPO_NAME=FIAP_${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+        run: echo "REPO_NAME=FIAP-${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       # Criar o cluster EKS
       - name: Create EKS Cluster
