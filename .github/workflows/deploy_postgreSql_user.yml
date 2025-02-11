@@ -4,7 +4,7 @@ on:
   workflow_dispatch: # Permite executar manualmente o workflow
 
 env:
-  CLUSTER_NAME: "infra-hackathon"  # Nome do cluster EKS
+  CLUSTER_NAME: "FIAP-infra-hackathon"  # Nome do cluster EKS
 
 jobs:
   ci:
