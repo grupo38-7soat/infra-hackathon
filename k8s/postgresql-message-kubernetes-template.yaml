@@ -82,12 +82,12 @@ data:
   init-db1.sql: |
     create type public.message_type_enum as enum (
       'SMS',
-      'EMAIL',
+      'EMAIL'
     );
 
     create type public.message_status_enum as enum (
       'SUCCESS',
-      'FAIL',
+      'FAIL'
     );
 
     create table if not exists public.message(
